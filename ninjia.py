@@ -88,7 +88,8 @@ classifyJson = {
 
 client = AipOcr(**config)
 
-type = input('请选择副本类型\n1.蝙蝠 2.西瓜 3.金币 4.飞镖 5.礼带 6.河豚 7.宝箱 8.无尽\n:')
+type = input('请选择副本类型 (默认为: 礼带)\n1.蝙蝠 2.西瓜 3.金币 4.飞镖 5.礼带 6.河豚 7.宝箱 8.无尽\n:')
+if type == '': type = 5
 
 def get_file_content(file):
     print('识别中...', file)
@@ -113,9 +114,10 @@ def img_to_str(image_path):
 
 def getImgInfo():
     print('图片格式必须为: pic+数字，请务必修改')
-    photoType = input("请输入图片后缀(默认为: jpg):")
+    photoType = input("请输入图片后缀 (默认为: jpg):")
     if photoType == '': photoType = 'jpg'
-    num = input("请输入图片数量:")
+    num = input("请输入图片数量 (默认为: 2):")
+    if num == '': num = '2'
     count = int(num)
     result = {}
     for i in range(1,count+1):
@@ -153,6 +155,9 @@ def getImgInfo():
                         score = score[::-1]
                         resultList[j] = resultList[j][:len(resultList[j])-1]
                     else: 
+                        score = score[::-1]
+                        score += '0'
+                        score = score[::-1]
                         break
                 resultList.insert(j+1, score)
                 # print('--------------分割成绩结束--------------')
@@ -201,15 +206,15 @@ def writeData(OCRResult):
                     maxSame = currentSame
                     row = i
             if row < 0 :
-                print("\033[1;37;41mERROR\033[0m 没有找到族员:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请确认他是否改名。不然就是程序出错了诶嘿😛" % (name,score))
+                print("\033[0;37;41mERROR\033[0m 没有找到族员:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请确认他是否改名。不然就是程序出错了诶嘿😛" % (name,score))
                 continue
             else :
-                print("\033[1;37;43mWARN\033[0m 没有找到族员:\033[0;30;47m%s\033[0m，名字最接近的族员是:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请留意匹配是否出错。" % (name,nameList[row],score))
+                print("\033[0;30;43mWARN\033[0m 没有找到族员:\033[0;30;47m%s\033[0m，名字最接近的族员是:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请留意匹配是否出错。" % (name,nameList[row],score))
         row += 3
         FuBen.cell(row,col).value = int(score)
     
     xlsx.save(excelPath)
-    print("\033[1;37;42mSUCCESS\033[0m 数据录入成功！")
+    print("\033[0;30;42mSUCCESS\033[0m 数据录入成功！")
     return col
 
 
@@ -221,14 +226,22 @@ def decorateData(col):
     FuBen.cell(2, col).value = FBType[type]
 
     border = Border(left=Side(border_style='thin', color='000000'), right=Side(border_style='thin', color='000000'), top=Side(border_style='thin',color='000000'), bottom=Side(border_style='thin',color='000000'))
+    
+    defaultAbsence = False
     for i in range(3, len(nameList)+ 3): 
         color = ""
         if FuBen.cell(i,col).value == None:
-            noScore = input("%s没有成绩，是否请假？(默认否,直接回车)[N/y]:" %(FuBen.cell(i,2).value))
-            if noScore == '': noScore = "N"
-            while noScore != 'N' and noScore != 'n' and noScore != 'Y' and noScore != 'y':
-                noScore = input("输入无效，请输入‘y’、‘n’或直接enter:")
+            if not defaultAbsence:
+                noScore = input("%s没有成绩，是否请假？(默认否,全部未请假输入all)[N/y/all]:" %(FuBen.cell(i,2).value))
                 if noScore == '': noScore = "N"
+                while noScore != 'N' and noScore != 'n' and noScore != 'Y' and noScore != 'y' and noScore != 'all':
+                    noScore = input("输入无效，请输入‘y’、‘n’、‘all’或直接enter:")
+                    if noScore == '': noScore = "N"
+                if noScore == 'all': 
+                    defaultAbsence = True
+                    noScore = 'N'
+            else:
+                noScore = 'N'       
             color = colorList['absence'] if noScore == "N" or noScore == "n" else colorList['leave']
         elif int(FuBen.cell(i,col).value) >= classify['A']:
             color = colorList['A']
@@ -242,7 +255,7 @@ def decorateData(col):
         FuBen.cell(i, col).border = border
     
     xlsx.save(excelPath)
-    print("\033[1;37;42mSUCCESS\033[0m 颜色填充成功！")
+    print("\033[0;30;42mSUCCESS\033[0m 颜色填充成功！")
 
 
 if __name__ == '__main__' :
