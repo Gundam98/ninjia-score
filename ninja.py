@@ -170,7 +170,7 @@ def getImgInfo():
 
 def getNameList():
     global excelPath
-    inputPath = input('请输入表格名 (默认为: 胧月成绩统计表.xlsx):')
+    inputPath = input('请输入表格名 (默认为: 胧月成绩统计总表.xlsx):')
     if inputPath != '': excelPath = inputPath
     excelPath = os.path.dirname(os.path.realpath(sys.executable)) + '/' + excelPath
     excel = load_workbook(excelPath)
@@ -195,7 +195,9 @@ def writeData(OCRResult):
 
     col = FuBen.max_column + 1
     inputCol = input('将在表格第%s列插入数据。输入数字更改，或enter确认:' %(col))
-    if inputCol != '': col = int(inputCol)
+    if inputCol != '' : col = int(inputCol)
+    maxScore = int(classifyJson[FBType[type]]['max'])
+    count = 0
     for name, score in OCRResult.items() :
         row = nameList.index(name) if (name in nameList) else -1
         if row < 0 :
@@ -210,11 +212,16 @@ def writeData(OCRResult):
                 continue
             else :
                 print("\033[0;30;43mWARN\033[0m 没有找到族员:\033[0;30;47m%s\033[0m，名字最接近的族员是:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请留意匹配是否出错。" % (name,nameList[row],score))
+        
+        if int(score) < maxScore * 0.9 :
+            print("\033[0;37;40mINFO\033[0m 族员:\033[0;30;47m%s\033[0m的成绩较为异常。他的成绩是:\033[0;37;44m%s\033[0m。请确认是否识别有误。" % (nameList[row],score))
+        
         row += 3
         FuBen.cell(row,col).value = int(score)
+        count += 1
     
     xlsx.save(excelPath)
-    print("\033[0;30;42mSUCCESS\033[0m 数据录入成功！")
+    print("\033[0;30;42mSUCCESS\033[0m 成功录入%d条数据！" % (count))
     return col
 
 
