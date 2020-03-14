@@ -25,7 +25,7 @@ FBType = {
 
 nameList = []
 
-excelPath = '胧月成绩统计表.xlsx'
+excelPath = '胧月成绩统计总表.xlsx'
 
 classifyJson = {
     "color": {
