@@ -70,8 +70,8 @@ classifyJson = {
     },
     "西瓜": {
         "A": 317,
-        "B": 315,
-        "C": 313,
+        "B": 314,
+        "C": 310,
         "max":317
     },
     "金币": {
@@ -159,18 +159,20 @@ def getImgInfo(signId):
         try:
             rawResult = getOCRResult(imagepath, templateSignList[signId])
             i += 1
-            if signId == 1 or signId == 3:
-                result = {**result, **generateDungeonData(rawResult)}
-            elif signId == 2:
-                result = {**result, **generateAbyssData(rawResult)}
-            else:
-                result = {**result, **generateFightData(rawResult)}
         except Exception as e:
             if i == 1:
                 print('未找到文件，请确认文件名是否正确')
                 exit(1)
             else:
                 break
+        if signId == 1:
+            result = {**result, **generatePreparationDungeonData(rawResult)}
+        elif signId == 2:
+            result = {**result, **generateAbyssData(rawResult)}
+        elif signId == 3:
+            result = {**result, **generateFamilyWarDungeonData(rawResult)}
+        else:
+            result = {**result, **generateFightData(rawResult)}
 
     print('数据如下：')
     print(result)
@@ -190,13 +192,20 @@ def getNameList():
             nameList.append(str(cell.value))
 
 
-def generateDungeonData(rawData):
+def generatePreparationDungeonData(rawData):
     j = 0
     result = {}
     while j < len(rawData):
         if 'member' in rawData[j]['word_name'] and 'score' in rawData[j+1]['word_name']:
-            name = rawData[j]['word'][0:len(rawData[j]['word']) - 2]
+            name = rawData[j]['word']
             score = rawData[j+1]['word']
+            if "新人" in name or "族员" in name or "精英" in name or "豪杰" in name or "长老" in name or "副族长" in name or "族长" in name:
+                name = name.replace('新人','')
+                name =name.replace('族员','')
+                name =name.replace('精英','')
+                name =name.replace('豪杰','')
+                name =name.replace('族长','')
+                name =name.replace('副族长','')
             result.update({name: score})
         else:
             print('数据出错，请重试。')
@@ -209,14 +218,38 @@ def generateAbyssData(rawData):
     result = {}
     while j < len(rawData):
         if 'member' in rawData[j]['word_name'] and 'damage' in rawData[j+1]['word_name'] and 'times' in rawData[j+2]['word_name']:
-            name = rawData[j]['word'][0:len(rawData[j]['word']) - 2]
+            name = rawData[j]['word']
+            if "新人" in name or "族员" in name or "精英" in name or "豪杰" in name or "副族长" in name or "族长" in name:
+                name = name[0:len(name) - 2]
+            # name = rawData[j]['word'][0:len(rawData[j]['word']) - 2]
             damage = rawData[j+1]['word']
             times = rawData[j+2]['word']
-            average = str(int(int(damage) / int(times)))
+            try:
+                average = str(int(int(damage) / int(times)))
+            except Exception as e:
+                print('\033[0;37;41mERROR\033[0m 族员:%s的平均伤害计算失败,请留意是否识别出错。他的成绩为:%s,%s' % (name, damage, times))
+                average = '0'
+            
             result.update({name: [damage, times, average]})
         else:
             print('数据出错，请重试。')
         j += 3
+    return result
+
+
+def generateFamilyWarDungeonData(rawData):
+    j = 0
+    tempDict = {}
+    result = {}
+    while j < len(rawData):
+        tempDict.update({rawData[j]['word_name']:rawData[j]['word']})
+        j += 1
+    j = 1
+    while j <= 6:
+        name = 'member#' + str(j)
+        score = 'score#' + str(j)
+        result.update({tempDict[name]:tempDict[score]})
+        j += 1
     return result
 
 
@@ -233,7 +266,13 @@ def writeDungeonData(OCRResult, dungeonType):
     if inputCol != '' : col = int(inputCol)
     maxScore = int(classifyJson[dungeonList[dungeonType]]['max'])
     count = 0
-    for name, score in OCRResult.items() :
+    preScore = {'score':maxScore}
+    nextScore = {'score':maxScore}
+    currentScore = {'score':maxScore}
+    currentRow = 0
+    nextRow = 0
+    for name, score in OCRResult.items():
+        # print(preScore,currentScore,nextScore)
         row = nameList.index(name) if (name in nameList) else -1
         if row < 0 :
             maxSame = 0
@@ -243,17 +282,56 @@ def writeDungeonData(OCRResult, dungeonType):
                     maxSame = currentSame
                     row = i
             if row < 0 :
-                print("\033[0;37;41mERROR\033[0m 没有找到族员:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请确认他是否改名。不然就是程序出错了诶嘿😛" % (name,score))
+                print("\033[0;37;41mERROR\033[0m 没有找到族员:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。他的大概排名为:\033[0;37;44m%d\033[0m。请确认他是否改名。不然就是程序出错了诶嘿😛" % (name,score,count+1))
                 continue
-            else :
+            elif  maxSame < 0.5:
                 print("\033[0;30;43mWARN\033[0m 没有找到族员:\033[0;30;47m%s\033[0m，名字最接近的族员是:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s\033[0m。请留意匹配是否出错。" % (name,nameList[row],score))
-            
-        if float(score) < maxScore * 0.9 :
-            print("\033[0;37;40mINFO\033[0m 族员:\033[0;30;47m%s\033[0m的成绩较为异常。他的成绩是:\033[0;37;44m%s\033[0m。请确认是否识别有误。" % (nameList[row],score))
-            
-        row += 3
-        sheet.cell(row,col).value = float(score)
+        try:
+            if 'score' in currentScore and 'score' in preScore and 'score' in nextScore and (float(currentScore['score']) > float(preScore['score']) or float(currentScore['score']) < float(nextScore['score']) or float(currentScore['score']) / float(preScore['score']) < 0.5 ):
+                if 'name' in currentScore:
+                    print("\033[0;30;43mINFO\033[0m 族员:\033[0;30;47m%s\033[0m的成绩较为异常。他的成绩是:\033[0;37;44m%s\033[0m。他的大概排名为:\033[0;37;44m%d\033[0m。请确认是否识别有误。(not the right rank)" % (nameList[currentRow],currentScore['score'],count-1))
+            else:
+                preScore = currentScore
+            currentScore = nextScore
+            currentRow = nextRow
+            nextScore = {'name':name,'score':score}
+            nextRow = row
+        except Exception:
+            pass
+
+        score = 0
+        row = 0
+        try:
+            if 'score' in currentScore:
+                score = float(currentScore['score'])
+                row = currentRow + 3
+            elif  'score' in nextScore:
+                score = float(nextScore['score'])
+                row = nextRow + 3
+            else:
+                print("\033[0;37;41mERROR\033[0m。程序出错了。(get current score or next score error)")
+        except Exception:
+            if 'score' in currentScore:
+                score = currentScore['score']
+                row = currentRow + 3
+            elif 'score' in nextScore:
+                score = nextScore['score']
+                row = nextRow + 3
+            else:
+                print("\033[0;37;41mERROR\033[0m。程序出错了。(get current score or next score error)")
+
+        sheet.cell(row,col).value = score
         count += 1
+    #将最后一个加进去
+    try:
+        if float(nextScore['score']) / float(currentScore['score']) < 0.5:
+            print("\033[0;30;43mINFO\033[0m 族员:\033[0;30;47m%s\033[0m的成绩较为异常。他的成绩是:\033[0;37;44m%s\033[0m。他的大概排名为:\033[0;37;44m%d\033[0m。请确认是否识别有误。(not the right rank)" % (nameList[nextRow],nextScore['score'],count))
+        score = float(nextScore['score'])
+    except Exception:
+        score = nextScore['score']
+    
+    row = nextRow + 3
+    sheet.cell(row,col).value = score
         
     xlsx.save(excelPath)
     print("\033[0;30;42mSUCCESS\033[0m 成功录入%d条数据！" % (count))
@@ -288,9 +366,15 @@ def writeAbyssData(OCRResult):
                 print("\033[0;30;43mWARN\033[0m 没有找到族员:\033[0;30;47m%s\033[0m，名字最接近的族员是:\033[0;30;47m%s\033[0m。他的成绩是:\033[0;37;44m%s,%s,%s\033[0m。请留意匹配是否出错。" % (name,nameList[row],damage, times, average))
                         
         row += 3
-        sheet.cell(row,col).value = float(damage)
-        sheet.cell(row,col+1).value = float(times)
-        sheet.cell(row,col+2).value = float(average)
+        try:
+            sheet.cell(row,col).value = float(damage)
+            sheet.cell(row,col+1).value = float(times)
+            sheet.cell(row,col+2).value = float(average)
+        except Exception as e:
+            print('\033[0;37;41mERROR\033[0m \033[0;30;47m%s\033[0m的成绩登记有误，请留意是否出错，他的成绩为:%s,%s,%s' % (name, damage, times, average))
+            sheet.cell(row,col).value = damage
+            sheet.cell(row,col+1).value = times
+            sheet.cell(row,col+2).value = average
 
         count += 1
         
@@ -305,6 +389,7 @@ def writeFightData(OCRResult):
 
 
 def decorateDungeonData(col, dungeonType):
+    input("输入任意键开始填充颜色……")
     xlsx = load_workbook(excelPath)
     FuBen = xlsx['副本']
     classify = classifyJson[dungeonList[dungeonType]]
@@ -371,12 +456,14 @@ def decorateAbyssData(col):
             color = absenceColor if noScore == "N" or noScore == "n" else leaveColor
 
             sheet.cell(i, col).fill = PatternFill(fill_type = 'solid', start_color=color, end_color=color)
-            sheet.cell(i, col).border = border
             sheet.cell(i, col+1).fill = PatternFill(fill_type = 'solid', start_color=color, end_color=color)
-            sheet.cell(i, col+1).border = border
             sheet.cell(i, col+2).fill = PatternFill(fill_type = 'solid', start_color=color, end_color=color)
-            sheet.cell(i, col+2).border = border
         
+        #描边
+        sheet.cell(i, col).border = border
+        sheet.cell(i, col+1).border = border
+        sheet.cell(i, col+2).border = border
+
     xlsx.save(excelPath)
     print("\033[0;30;42mSUCCESS\033[0m 颜色填充成功！")
 
@@ -407,7 +494,10 @@ def abyss():
 
 
 def familyWarDungeon():
-    return
+    dungeonType = input('请选择副本类型 (默认为: 礼带)\n1.蝙蝠 2.西瓜 3.金币 4.飞镖 5.礼带 6.河豚 7.宝箱 8.无尽\n:')
+    if dungeonType == '': dungeonType = '5'
+    result = getImgInfo(3)
+    processData(result, 3, dungeonType = dungeonType)
 
 
 def familyWarFight():
